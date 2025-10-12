@@ -50,6 +50,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+FetchContent_Declare(
+  cpr
+  GIT_REPOSITORY https://github.com/libcpr/cpr.git
+  GIT_TAG        1.12.0
+  GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(cpr)
+
 include_directories(
   ${hidapi_SOURCE_DIR}
   ${libevent_SOURCE_DIR}/include
@@ -62,4 +70,10 @@ target_link_libraries(irock-74m-server PRIVATE
   absl::log
   event_core
   event_extra
+)
+
+add_executable(irock-bot bot.cc)
+target_link_libraries(irock-bot PRIVATE
+  absl::strings
+  cpr::cpr
 )
