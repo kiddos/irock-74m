@@ -1,16 +1,17 @@
-#include <hidapi/hidapi.h>
-#include <iostream>
-#include <memory>
-#include <signal.h>
 #include <absl/log/log.h>
-#include "irock_74m.h"
-#include <nlohmann/json.hpp>
-
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
 #include <event2/util.h>
+#include <hidapi/hidapi.h>
+#include <signal.h>
+
+#include <iostream>
+#include <memory>
+#include <nlohmann/json.hpp>
+
+#include "irock_74m.h"
 
 static std::unique_ptr<irock::Keyboard74M> keyboard;
 
@@ -22,14 +23,8 @@ void sigint_handler(int) {
   exit(0);
 }
 
-struct Configuration {
-  irock::Mode mode;
-  irock::Brightness brightness;
-  irock::Speed speed;
-};
-
-std::optional<Configuration> parse(nlohmann::json& value) {
-  std::optional<Configuration> c;
+std::optional<irock::Configuration> parse(nlohmann::json& value) {
+  std::optional<irock::Configuration> c;
   std::vector<std::string> check_int = {"mode", "brightness", "speed"};
   for (std::string& field : check_int) {
     if (!value[field].is_number_integer()) {
@@ -38,18 +33,16 @@ std::optional<Configuration> parse(nlohmann::json& value) {
     }
   }
 
-  Configuration conf;
-  conf.mode = (irock::Mode) value["mode"].get<int>();
-  conf.brightness = (irock::Brightness) value["brightness"].get<int>();
-  conf.speed = (irock::Speed) value["speed"].get<int>();
+  irock::Configuration conf;
+  conf.mode = (irock::Mode)value["mode"].get<int>();
+  conf.brightness = (irock::Brightness)value["brightness"].get<int>();
+  conf.speed = (irock::Speed)value["speed"].get<int>();
   return std::optional(conf);
 }
 
 class HTTPServer {
  public:
-  HTTPServer() : base_(nullptr), http_(nullptr), handle_(nullptr) {
-    init();
-  }
+  HTTPServer() : base_(nullptr), http_(nullptr), handle_(nullptr) { init(); }
   ~HTTPServer() {
     if (http_) {
       evhttp_free(http_);
@@ -70,7 +63,6 @@ class HTTPServer {
     if (!http_) {
       return;
     }
-
   }
 
   void Start() {
@@ -86,7 +78,8 @@ class HTTPServer {
                 << std::endl;
       return;
     }
-    LOG(INFO) << "Libevent HTTP server listening on http://" << http_addr << ":" << port;
+    LOG(INFO) << "Libevent HTTP server listening on http://" << http_addr << ":"
+              << port;
     LOG(INFO) << " Press Ctrl+C to stop.";
 
     event_base_dispatch(base_);
@@ -98,9 +91,9 @@ class HTTPServer {
       return;
     }
 
-    struct evbuffer *input_buf = evhttp_request_get_input_buffer(req);
+    struct evbuffer* input_buf = evhttp_request_get_input_buffer(req);
     size_t post_data_len = evbuffer_get_length(input_buf);
-    char *post_data = (char*)malloc(post_data_len + 1);
+    char* post_data = (char*)malloc(post_data_len + 1);
     if (!post_data) return;
 
     evbuffer_copyout(input_buf, post_data, post_data_len);
@@ -113,7 +106,8 @@ class HTTPServer {
     auto config = parse(json);
     if (config && keyboard) {
       LOG(INFO) << "set config";
-      keyboard->SetConfiguration(config->mode, config->brightness, config->speed);
+      keyboard->SetConfiguration(config->mode, config->brightness,
+                                 config->speed);
     }
 
     evhttp_send_reply(req, 200, "OK", NULL);

@@ -25,7 +25,7 @@ enum Mode {
   FLASH_AWAY = 0x0A,
   SHADOW_DISAPPEAR = 0x0B,
   RIPPLE_SHINING = 0x0C,
-  RICH_ANDD_HONOURED = 0x0D,
+  RICH_AND_HONOURED = 0x0D,
   MARQUEE_EFFECT = 0x0E,
   ROTATING_STORM = 0x0F,
   SERPENTINE_HORSE_RACE = 0x10,
@@ -52,6 +52,12 @@ enum Speed {
   SPEED_3 = 3,
   SPEED_4 = 4,
   SPEED_5 = 5,
+};
+
+struct Configuration {
+  Mode mode;
+  Brightness brightness;
+  Speed speed;
 };
 
 class Keyboard74M {
