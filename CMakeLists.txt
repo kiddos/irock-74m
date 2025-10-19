@@ -45,8 +45,9 @@ FetchContent_MakeAvailable(libevent)
 FetchContent_Declare(
   json
   GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG v3.12.0
-  GIT_SHALLOW TRUE
+  GIT_TAG        v3.12.0
+  GIT_SHALLOW    TRUE
+  GIT_PROGRESS   TRUE
 )
 FetchContent_MakeAvailable(json)
 
@@ -59,13 +60,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cpr)
 
-include_directories(
+FetchContent_Declare(
+  CLI11
+  GIT_REPOSITORY https://github.com/CLIUtils/CLI11
+  GIT_TAG        v2.4.2
+  GIT_SHALLOW    TRUE
+  GIT_PROGRESS   TRUE
+)
+FetchContent_MakeAvailable(CLI11)
+
+add_executable(irock-74m-server server.cc irock_74m.cc)
+target_include_directories(irock-74m-server PRIVATE
   ${hidapi_SOURCE_DIR}
   ${libevent_SOURCE_DIR}/include
   ${json_SOURCE_DIR}/include
+  ${CLI11_SOURCE_DIR}/include
 )
-
-add_executable(irock-74m-server server.cc irock_74m.cc)
 target_link_libraries(irock-74m-server PRIVATE
   hidapi::libusb
   absl::log
@@ -74,6 +84,9 @@ target_link_libraries(irock-74m-server PRIVATE
 )
 
 add_executable(irock-bot bot.cc)
+target_include_directories(irock-bot PRIVATE
+  ${json_SOURCE_DIR}/include
+)
 target_link_libraries(irock-bot PRIVATE
   absl::strings
   cpr::cpr

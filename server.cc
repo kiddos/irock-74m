@@ -6,9 +6,10 @@
 #include <event2/util.h>
 #include <hidapi/hidapi.h>
 #include <signal.h>
+#include <CLI/CLI.hpp>
+#include <nlohmann/json.hpp>
 
 #include <memory>
-#include <nlohmann/json.hpp>
 
 #include "irock_74m.h"
 
@@ -34,7 +35,14 @@ std::optional<irock::Configuration> parse(nlohmann::json& value) {
 void request_handler(evhttp_request* req, void*);
 void signal_cb(evutil_socket_t sig, short, void* arg);
 
-int main() {
+int main(int argc, char* argv[]) {
+  CLI::App app{"keyboard control bot"};
+  argv = app.ensure_utf8(argv);
+
+  int port = 9100;
+  app.add_option("--port", port, "port");
+  CLI11_PARSE(app, argc, argv);
+
   if (hid_init() != 0) {
     LOG(ERROR) << "Failed to initialize hidapi";
     return 1;
@@ -73,9 +81,9 @@ int main() {
   evhttp_set_gencb(http, request_handler, nullptr);
 
   // Bind the HTTP server to an address and port
-  unsigned short port = 9100;
   std::string http_addr = "0.0.0.0";
-  evhttp_bound_socket* handle = evhttp_bind_socket_with_handle(http, http_addr.c_str(), port);
+  evhttp_bound_socket* handle =
+      evhttp_bind_socket_with_handle(http, http_addr.c_str(), port);
   if (!handle) {
     LOG(ERROR) << "fail to bind address: " << http_addr << ":" << port;
     return 1;
@@ -127,8 +135,7 @@ void request_handler(evhttp_request* req, void*) {
   auto config = parse(json);
   if (config && keyboard) {
     LOG(INFO) << "set config";
-    keyboard->SetConfiguration(config->mode, config->brightness,
-                                config->speed);
+    keyboard->SetConfiguration(config->mode, config->brightness, config->speed);
   }
 
   evhttp_send_reply(req, 200, "OK", NULL);
