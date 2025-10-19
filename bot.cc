@@ -107,7 +107,7 @@ int main(void) {
     return 0;
   }
 
-  std::cout << "deivce=" << *keyboard << std::endl;
+  std::cout << "device=" << *keyboard << std::endl;
   fd = open(keyboard->c_str(), O_RDONLY);
   if (fd < 0) {
     return 0;
@@ -117,8 +117,10 @@ int main(void) {
 
   std::deque<KeyEvent> d;
 
-  constexpr int INTERVAL = 60 * 1000;
+  constexpr int INTERVAL = 60 * 1000; // 1 min
+  constexpr int IDLE_TIME = 60 * 1000 * 10; // 10 min
   struct input_event ev;
+  u64 idle_start = 0;
   while (true) {
     u64 current_t = get_system_millis();
     size_t size = d.size();
@@ -132,6 +134,15 @@ int main(void) {
           irock::SPEED_1,
       };
       SetConfig(config);
+      idle_start = current_t;
+    } else if (idle_start > 0 && current_t - idle_start >= IDLE_TIME) {
+      irock::Configuration config{
+          irock::OFF,
+          irock::BRIGHTNESS_0,
+          irock::SPEED_0,
+      };
+      SetConfig(config);
+      idle_start = 0;
     }
 
     fd_set read_fds;
@@ -171,6 +182,7 @@ int main(void) {
             SetConfig(config);
           }
 
+          idle_start = 0;
           d.push_back(KeyEvent{keycode, t});
         }
       }
