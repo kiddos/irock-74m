@@ -7,21 +7,12 @@
 #include <hidapi/hidapi.h>
 #include <signal.h>
 
-#include <iostream>
 #include <memory>
 #include <nlohmann/json.hpp>
 
 #include "irock_74m.h"
 
 static std::unique_ptr<irock::Keyboard74M> keyboard;
-
-void sigint_handler(int) {
-  if (keyboard) {
-    keyboard->Close();
-  }
-  hid_exit();
-  exit(0);
-}
 
 std::optional<irock::Configuration> parse(nlohmann::json& value) {
   std::optional<irock::Configuration> c;
@@ -40,100 +31,105 @@ std::optional<irock::Configuration> parse(nlohmann::json& value) {
   return std::optional(conf);
 }
 
-class HTTPServer {
- public:
-  HTTPServer() : base_(nullptr), http_(nullptr), handle_(nullptr) { init(); }
-  ~HTTPServer() {
-    if (http_) {
-      evhttp_free(http_);
-    }
-
-    if (base_) {
-      event_base_free(base_);
-    }
-  }
-
-  void init() {
-    base_ = event_base_new();
-    if (!base_) {
-      return;
-    }
-
-    http_ = evhttp_new(base_);
-    if (!http_) {
-      return;
-    }
-  }
-
-  void Start() {
-    LOG(INFO) << "starting http server...";
-    evhttp_set_gencb(http_, request_handler, nullptr);
-
-    // Bind the HTTP server to an address and port
-    unsigned short port = 9100;
-    std::string http_addr = "0.0.0.0";
-    handle_ = evhttp_bind_socket_with_handle(http_, http_addr.c_str(), port);
-    if (!handle_) {
-      std::cerr << "fail to bind address: " << http_addr << ":" << port
-                << std::endl;
-      return;
-    }
-    LOG(INFO) << "Libevent HTTP server listening on http://" << http_addr << ":"
-              << port;
-    LOG(INFO) << " Press Ctrl+C to stop.";
-
-    event_base_dispatch(base_);
-  }
-
-  static void request_handler(evhttp_request* req, void*) {
-    if (evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
-      evhttp_send_error(req, HTTP_BADREQUEST, "Only POST supported");
-      return;
-    }
-
-    struct evbuffer* input_buf = evhttp_request_get_input_buffer(req);
-    size_t post_data_len = evbuffer_get_length(input_buf);
-    char* post_data = (char*)malloc(post_data_len + 1);
-    if (!post_data) return;
-
-    evbuffer_copyout(input_buf, post_data, post_data_len);
-    post_data[post_data_len] = '\0';
-
-    std::string content = post_data;
-    free(post_data);
-
-    auto json = nlohmann::json::parse(content);
-    auto config = parse(json);
-    if (config && keyboard) {
-      LOG(INFO) << "set config";
-      keyboard->SetConfiguration(config->mode, config->brightness,
-                                 config->speed);
-    }
-
-    evhttp_send_reply(req, 200, "OK", NULL);
-  }
-
- private:
-  event_base* base_;
-  evhttp* http_;
-  evhttp_bound_socket* handle_;
-};
+void request_handler(evhttp_request* req, void*);
+void signal_cb(evutil_socket_t sig, short, void* arg);
 
 int main() {
   if (hid_init() != 0) {
-    std::cerr << "Failed to initialize hidapi\n";
+    LOG(ERROR) << "Failed to initialize hidapi";
     return 1;
   }
-  signal(SIGINT, &sigint_handler);
+
+  event_base* base = event_base_new();
+  if (!base) {
+    LOG(ERROR) << "fail to create event_base";
+    return 1;
+  }
+  evhttp* http = evhttp_new(base);
+  if (!http) {
+    LOG(ERROR) << "fail to create evhttp";
+    return 1;
+  }
+
+  event* signal_event =
+      event_new(base, SIGINT, EV_SIGNAL | EV_PERSIST, signal_cb, (void*)base);
+  if (!signal_event) {
+    LOG(ERROR) << "fail to create signal event";
+    evhttp_free(http);
+    event_base_free(base);
+    return 1;
+  }
+
+  if (event_add(signal_event, nullptr) < 0) {
+    LOG(ERROR) << "fail to add signal event";
+    event_free(signal_event);
+    event_base_free(base);
+    return 1;
+  }
 
   using namespace irock;
   keyboard = std::make_unique<irock::Keyboard74M>();
-  keyboard->SetConfiguration(STEADY, BRIGHTNESS_1, SPEED_0);
 
-  HTTPServer server;
-  server.Start();
+  evhttp_set_gencb(http, request_handler, nullptr);
 
+  // Bind the HTTP server to an address and port
+  unsigned short port = 9100;
+  std::string http_addr = "0.0.0.0";
+  evhttp_bound_socket* handle = evhttp_bind_socket_with_handle(http, http_addr.c_str(), port);
+  if (!handle) {
+    LOG(ERROR) << "fail to bind address: " << http_addr << ":" << port;
+    return 1;
+  }
+
+  LOG(INFO) << "Libevent HTTP server listening on http://" << http_addr << ":"
+            << port;
+  LOG(INFO) << "Press Ctrl+C to stop.";
+
+  event_base_dispatch(base);
+
+  LOG(INFO) << "closing keyboard hid";
   keyboard->Close();
   hid_exit();
+
+  evhttp_free(http);
+  event_base_free(base);
   return 0;
+}
+
+void signal_cb(evutil_socket_t sig, short, void* arg) {
+  event_base* base = (event_base*)arg;
+  if (base) {
+    LOG(INFO) << "Caught signal " << sig << " stopping the event loop...";
+    event_base_loopbreak(base);
+  }
+}
+
+void request_handler(evhttp_request* req, void*) {
+  if (evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
+    evhttp_send_error(req, HTTP_BADREQUEST, "Only POST supported");
+    return;
+  }
+
+  struct evbuffer* input_buf = evhttp_request_get_input_buffer(req);
+  size_t post_data_len = evbuffer_get_length(input_buf);
+  char* post_data = (char*)malloc(post_data_len + 1);
+  if (!post_data) {
+    return;
+  }
+
+  evbuffer_copyout(input_buf, post_data, post_data_len);
+  post_data[post_data_len] = '\0';
+
+  std::string content = post_data;
+  free(post_data);
+
+  auto json = nlohmann::json::parse(content);
+  auto config = parse(json);
+  if (config && keyboard) {
+    LOG(INFO) << "set config";
+    keyboard->SetConfiguration(config->mode, config->brightness,
+                                config->speed);
+  }
+
+  evhttp_send_reply(req, 200, "OK", NULL);
 }
