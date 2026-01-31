@@ -33,6 +33,7 @@ set(EVENT__DISABLE_BENCHMARK ON CACHE BOOL "Disable libevent benchmark" FORCE)
 set(EVENT__DISABLE_TESTS ON CACHE BOOL "Disable libevent tests" FORCE)
 set(EVENT__DISABLE_REGRESS ON CACHE BOOL "Disable libevent regress" FORCE)
 set(EVENT__DISABLE_DOXYGEN ON CACHE BOOL "Disable libevent doxygen" FORCE)
+set(EVENT__LIBRARY_TYPE "STATIC" CACHE INTERNAL "")
 FetchContent_Declare(
   libevent
   GIT_REPOSITORY https://github.com/libevent/libevent.git
