@@ -4,6 +4,7 @@
 #include <linux/input.h>
 #include <signal.h>
 #include <unistd.h>
+#include <CLI/CLI.hpp>
 
 #include <chrono>
 #include <deque>
@@ -100,7 +101,15 @@ void SetConfig(irock::Configuration config) {
       cpr::Header{{"Content-Type", "application/json"}}, cpr::Body{json_data});
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
+  CLI::App app{"irock 74m bot"};
+  argv = app.ensure_utf8(argv);
+
+  int interval = 60 * 1000 * 5; // default 5 minute
+  int idle_time = 60 * 1000 * 10; // 10 min
+  app.add_option("--interval", interval, "");
+  CLI11_PARSE(app, argc, argv);
+
   auto keyboard = FindKeyboardDevice();
   if (!keyboard) {
     std::cerr << "fail to find keyboard device" << std::endl;
@@ -117,14 +126,12 @@ int main(void) {
 
   std::deque<KeyEvent> d;
 
-  constexpr int INTERVAL = 60 * 1000; // 1 min
-  constexpr int IDLE_TIME = 60 * 1000 * 10; // 10 min
   struct input_event ev;
   u64 idle_start = 0;
   while (true) {
     u64 current_t = get_system_millis();
     size_t size = d.size();
-    while (!d.empty() && current_t - d.front().t >= INTERVAL) {
+    while (!d.empty() && current_t - d.front().t >= (size_t)interval) {
       d.pop_front();
     }
     if (size > 0 && d.empty()) {
@@ -135,7 +142,7 @@ int main(void) {
       };
       SetConfig(config);
       idle_start = current_t;
-    } else if (idle_start > 0 && current_t - idle_start >= IDLE_TIME) {
+    } else if (idle_start > 0 && current_t - idle_start >= (size_t)idle_time) {
       irock::Configuration config{
           irock::OFF,
           irock::BRIGHTNESS_0,

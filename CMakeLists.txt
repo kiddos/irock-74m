@@ -87,6 +87,7 @@ target_link_libraries(irock-74m-server PRIVATE
 add_executable(irock-bot bot.cc)
 target_include_directories(irock-bot PRIVATE
   ${json_SOURCE_DIR}/include
+  ${CLI11_SOURCE_DIR}/include
 )
 target_link_libraries(irock-bot PRIVATE
   absl::strings
