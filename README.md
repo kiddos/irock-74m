@@ -8,7 +8,7 @@ I reverse engineer the usb packet in this google sheet:
 
 https://docs.google.com/spreadsheets/d/1USv1qFaWV14PxGkvopRJYdi818f88eJyBioqb9oLgBw/edit?usp=sharing
 
-this project current contains a `http server` and a `bot`.
+this project current contains a `http server`, a `bot`, and an `imgui ui`.
 
 ## server 
 
@@ -20,6 +20,14 @@ the server current accept message like
     "brightness": 3,
     "speed": 2
 }
+```
+
+## ui (imgui)
+
+the ImGui GUI allows configuring and sending JSON configuration (`mode`, `brightness`, `speed`) to the HTTP server interactively.
+
+```sh
+./build/irock-ui --url http://localhost:9100
 ```
 
 ## bot

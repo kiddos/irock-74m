@@ -70,6 +70,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(CLI11)
 
+FetchContent_Declare(
+  imgui
+  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+  GIT_TAG        v1.90.8
+  GIT_SHALLOW    TRUE
+  GIT_PROGRESS   TRUE
+)
+FetchContent_MakeAvailable(imgui)
+
+find_package(OpenGL REQUIRED)
+find_package(glfw3 REQUIRED)
+
 add_executable(irock-74m-server server.cc irock_74m.cc)
 target_include_directories(irock-74m-server PRIVATE
   ${hidapi_SOURCE_DIR}
@@ -86,10 +98,36 @@ target_link_libraries(irock-74m-server PRIVATE
 
 add_executable(irock-bot bot.cc)
 target_include_directories(irock-bot PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${hidapi_SOURCE_DIR}
   ${json_SOURCE_DIR}/include
   ${CLI11_SOURCE_DIR}/include
 )
 target_link_libraries(irock-bot PRIVATE
   absl::strings
   cpr::cpr
+)
+
+add_executable(irock-ui
+  ui.cc
+  ${imgui_SOURCE_DIR}/imgui.cpp
+  ${imgui_SOURCE_DIR}/imgui_draw.cpp
+  ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+  ${imgui_SOURCE_DIR}/imgui_tables.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+  ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(irock-ui PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${hidapi_SOURCE_DIR}
+  ${imgui_SOURCE_DIR}
+  ${imgui_SOURCE_DIR}/backends
+  ${json_SOURCE_DIR}/include
+  ${CLI11_SOURCE_DIR}/include
+)
+target_link_libraries(irock-ui PRIVATE
+  cpr::cpr
+  glfw
+  OpenGL::GL
+  absl::log
 )
